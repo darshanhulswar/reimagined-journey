@@ -1,15 +1,19 @@
 pipeline{
     agent any
     stages{
-        stage('Build'){
-            steps {
-                echo "Building..."
-            }
-        }
+        stage('Build & Test'){
+            stages{
+                stage('Compile'){
+                    steps{
+                        echo "hello this is compiling"
+                    }
+                }
+                stage('Unit testing'){
+                    steps{
+                        echo "Running unit tests..."
+                    }
+                }
 
-        stage('Test'){
-            steps {
-                echo "this is testing..."
             }
         }
 
