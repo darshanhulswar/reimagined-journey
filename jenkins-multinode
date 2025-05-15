@@ -1,0 +1,27 @@
+pipeline{
+    agent none
+
+    stages{
+        stage('Build'){
+            agent{
+                label 'prod'
+            }
+            steps{
+                sh '''
+                    hostname
+                '''
+            }
+        }
+        stage('test'){
+            agent{
+                label 'dev'
+            }
+            steps{
+                sh '''
+                    hostname
+                '''
+            }
+        }        
+    }
+
+}
