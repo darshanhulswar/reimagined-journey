@@ -1,0 +1,50 @@
+pipeline{
+    agent {
+        label 'dev'
+    } 
+
+    stages{
+        stage('hostname'){
+            steps{
+                sh'''
+                    hostname
+                '''
+            }
+        }        
+        stage('serverinfo'){
+            steps{
+                sh'''
+                    uname -a
+                '''
+            }
+        }
+        stage('os-details'){
+            steps{
+                sh'''
+                    cat /etc/os-release
+                '''
+            }
+        }
+        stage('disk-space'){
+            steps{
+                sh'''
+                    df -kh
+                '''
+            }
+        }
+        stage('cpu-details'){
+            steps{
+                sh'''
+                    lscpu
+                '''
+            }
+        }
+        stage('memory-details'){
+            steps{
+                sh'''
+                    free -h
+                '''
+            }
+        }                                  
+    }
+}
