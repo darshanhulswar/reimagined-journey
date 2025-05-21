@@ -9,7 +9,7 @@ pipeline{
 
         stage('Docker image build'){
             steps{
-                sh "docker build -t manojkrishnappa/djano-application:1 -f ecommerce/Dockerfile."
+                sh "docker build -t manojkrishnappa/djano-application:1 -f ecommerce/Dockerfile ."
             }
         }
         stage('Containersation'){
