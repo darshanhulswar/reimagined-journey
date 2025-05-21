@@ -19,7 +19,7 @@ pipeline{
         stage('Containersation'){
             steps{
                 sh '''
-                    docker run -it -d --name c3 -p 9003:8080 manojkrishnappa/djano-application:1
+                    docker run -it -d -p 8000:8000 manojkrishnappa/djano-application:1
                 '''
             }
         } 
