@@ -1,1 +1,1 @@
-iam_users = ["Manoj", "microdegree", "naruto","test","micro","zoro"]
+iam_users = ["Manoj", "microdegree"]

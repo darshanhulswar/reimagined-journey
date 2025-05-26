@@ -12,7 +12,15 @@ pipeline {
   }
 
   stages {
-    stage('Prepare Workspace') {
+    stage('Checkout Terraform Repo') {
+      steps {
+        dir('project-2') {
+          git branch: 'terraform', url: 'https://github.com/ManojKRISHNAPPA/reimagined-journey.git'
+        }
+      }
+    }
+
+    stage('Initialize Terraform') {
       steps {
         dir('project-2') {
           sh 'terraform init'
@@ -20,41 +28,50 @@ pipeline {
       }
     }
 
-    stage('Apply or Destroy User') {
+    stage('Update users.txt and terraform.tfvars') {
       steps {
-        script {
-          dir('project-2') {
+        dir('project-2') {
+          script {
             if (params.terraformAction == 'apply') {
-              echo "Applying changes for user: ${params.NEW_USER}"
-
+              echo "Adding user: ${params.NEW_USER}"
               sh '''
-                echo "Updating terraform.tfvars with new user: ${NEW_USER}"
-
-                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+                # Create users.txt if missing
+                touch users.txt
                 
-                if ! echo "$CURRENT_USERS" | grep -qw "${NEW_USER}"; then
-                  UPDATED_USERS=$(echo "$CURRENT_USERS" | awk -v new="${NEW_USER}" 'BEGIN{ORS=""; print "["} {n=split($0, a, ","); for(i=1;i<=n;i++) if (length(a[i]) > 0) printf "\\"%s\\",", a[i]; print "\\"%s\\""]", new}')
-                  echo "iam_users = ${UPDATED_USERS}" > terraform.tfvars
+                # Add user if not present
+                if ! grep -qx "${NEW_USER}" users.txt; then
+                  echo "${NEW_USER}" >> users.txt
                 fi
-
-                terraform apply -auto-approve
+                
+                # Generate terraform.tfvars from users.txt
+                echo -n 'iam_users = [' > terraform.tfvars
+                awk '{printf "\\"%s\\",", $0}' users.txt >> terraform.tfvars
+                sed -i '$ s/,$/]/' terraform.tfvars
               '''
-
             } else if (params.terraformAction == 'destroy') {
-              echo "Destroying user: ${params.NEW_USER}"
-
+              echo "Removing user: ${params.NEW_USER}"
               sh '''
-                echo "Preparing to remove user: ${NEW_USER}"
-
-                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
-                FILTERED_USERS=$(echo "$CURRENT_USERS" | tr ',' '\\n' | grep -vw "${NEW_USER}" | awk 'BEGIN{ORS=""; print "["} {printf "\\"%s\\",", $1} END{print "]"}')
-
-                echo "iam_users = ${FILTERED_USERS}" > terraform.tfvars
-
-                terraform apply -auto-approve
+                # Remove user from users.txt
+                if [ -f users.txt ]; then
+                  grep -vx "${NEW_USER}" users.txt > users.tmp || true
+                  mv users.tmp users.txt
+                fi
+                
+                # Generate terraform.tfvars from users.txt
+                echo -n 'iam_users = [' > terraform.tfvars
+                awk '{printf "\\"%s\\",", $0}' users.txt >> terraform.tfvars
+                sed -i '$ s/,$/]/' terraform.tfvars
               '''
             }
           }
+        }
+      }
+    }
+
+    stage('Terraform Apply') {
+      steps {
+        dir('project-2') {
+          sh 'terraform apply -auto-approve'
         }
       }
     }
