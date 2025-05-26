@@ -1,0 +1,90 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'NEW_USER', defaultValue: 'newuser', description: 'IAM user to add or remove')
+    choice(name: 'terraformAction', choices: ['apply', 'destroy'], description: 'Choose Terraform action: apply (create user) or destroy (delete user)')
+  }
+
+  environment {
+    AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    GIT_CREDENTIALS_ID    = 'your-git-credentials-id' // Replace this with actual credentials ID
+  }
+
+  stages {
+    stage('Checkout Repo') {
+      steps {
+        dir('project-2') {
+          git branch: 'terraform', url: 'https://github.com/ManojKRISHNAPPA/reimagined-journey.git', credentialsId: "${env.GIT_CREDENTIALS_ID}"
+        }
+      }
+    }
+
+    stage('Terraform Init') {
+      steps {
+        dir('project-2') {
+          sh 'terraform init'
+        }
+      }
+    }
+
+    stage('Apply or Destroy User') {
+      steps {
+        script {
+          dir('project-2') {
+            if (params.terraformAction == 'apply') {
+              echo "Applying changes for user: ${params.NEW_USER}"
+
+              sh '''
+                echo "Updating terraform.tfvars with new user: ${NEW_USER}"
+
+                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+                
+                if ! echo "$CURRENT_USERS" | grep -qw "${NEW_USER}"; then
+                  UPDATED_USERS=$(echo "$CURRENT_USERS" | awk -v new="${NEW_USER}" 'BEGIN{ORS=""; print "["} {n=split($0, a, ","); for(i=1;i<=n;i++) if (length(a[i]) > 0) printf "\\"%s\\",", a[i]; printf "\\"%s\\"]", new}')
+                  echo "iam_users = ${UPDATED_USERS}" > terraform.tfvars
+                fi
+
+                terraform apply -auto-approve
+              '''
+            }
+
+            if (params.terraformAction == 'destroy') {
+              echo "Destroying user: ${params.NEW_USER}"
+
+              sh '''
+                echo "Removing user ${NEW_USER} from terraform.tfvars"
+
+                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+                
+                FILTERED_USERS=$(echo "$CURRENT_USERS" | tr ',' '\\n' | grep -vw "${NEW_USER}" | awk 'BEGIN{ORS=""; print "["} {printf "\\"%s\\",", $1} END{sub(/,$/, "", ORS); print "]"}')
+                
+                echo "iam_users = ${FILTERED_USERS}" > terraform.tfvars
+
+                terraform apply -auto-approve
+              '''
+            }
+          }
+        }
+      }
+    }
+
+    stage('Commit & Push Changes') {
+      steps {
+        dir('project-2') {
+          withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+            sh '''
+              git config user.email "jenkins@example.com"
+              git config user.name "jenkins"
+
+              git add terraform.tfvars
+              git commit -m "Update IAM users list: ${NEW_USER} (${terraformAction})" || echo "No changes to commit"
+              git push https://${GIT_USER}:${GIT_PASS}@github.com/ManojKRISHNAPPA/reimagined-journey.git terraform
+            '''
+          }
+        }
+      }
+    }
+  }
+}
