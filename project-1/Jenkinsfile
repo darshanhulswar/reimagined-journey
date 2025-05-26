@@ -1,63 +1,64 @@
-pipeline{
-    parameters{
-        choice(name: 'terraformAction',choices: ['apply','destroy'],description: 'Choose your terraform action to perform')
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'NEW_USER', defaultValue: 'newuser', description: 'IAM user to add or remove')
+    choice(name: 'terraformAction', choices: ['apply', 'destroy'], description: 'Choose Terraform action: apply (create user) or destroy (delete user)')
+  }
+
+  environment {
+    AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+  }
+
+  stages {
+    stage('Terraform Init') {
+      steps {
+        dir('project-2') {
+          sh 'terraform init'
+        }
+      }
     }
 
-    environment {
-        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    stage('Apply or Destroy User') {
+      steps {
+        script {
+          dir('project-2') {
+            if (params.terraformAction == 'apply') {
+              echo "Applying changes for user: ${params.NEW_USER}"
+
+              sh '''
+                echo "Updating terraform.tfvars with new user: ${NEW_USER}"
+
+                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+                
+                if ! echo "$CURRENT_USERS" | grep -qw "${NEW_USER}"; then
+                  UPDATED_USERS=$(echo "$CURRENT_USERS" | awk -v new="${NEW_USER}" 'BEGIN{ORS=""; print "["} {n=split($0, a, ","); for(i=1;i<=n;i++) if (length(a[i]) > 0) printf "\\"%s\\",", a[i]; printf "\\"%s\\"]", new}')
+                  echo "iam_users = ${UPDATED_USERS}" > terraform.tfvars
+                fi
+
+                terraform apply -auto-approve
+              '''
+            }
+
+            else if (params.terraformAction == 'destroy') {
+              echo "Destroying user: ${params.NEW_USER}"
+
+              sh '''
+                echo "Removing user ${NEW_USER} from terraform.tfvars"
+
+                CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+                
+                FILTERED_USERS=$(echo "$CURRENT_USERS" | tr ',' '\\n' | grep -vw "${NEW_USER}" | awk 'BEGIN{ORS=""; print "["} {printf "\\"%s\\",", $1} END{sub(/,$/, "", ORS); print "]"}')
+                
+                echo "iam_users = ${FILTERED_USERS}" > terraform.tfvars
+
+                terraform apply -auto-approve
+              '''
+            }
+          }
+        }
+      }
     }
-
-    agent any
-
-    stages{
-        stage('checkout'){
-            steps{
-                script {
-                    dir("terraform"){
-                        git branch: 'terraform',url:'https://github.com/ManojKRISHNAPPA/reimagined-journey.git'
-                    }
-                }
-            }
-        }
-
-
-        stage('Plan'){
-            steps{
-                sh 'pwd;cd project-1/; terraform init'
-                sh 'pwd;cd project-1/; terraform plan -out tfplan'
-                sh 'pwd;cd project-1/; terraform show -no-color tfplan >> tfplan.txt'
-            }
-        }
-
-        stage('approval'){
-            steps{
-                script {
-                    def plan = readFile 'project-1/tfplan.txt'
-                    input message: "Do you want to proced with terraform action..?"
-                    parameters: [text(name:'plan',description: 'Can you review your code one more time',defaultValue: plan)]
-                }
-            }
-        }
-
-        stage('Apply or Destroy'){
-            when{
-                expression{
-                    return params.terraformAction == 'apply' || params.terraformAction == 'destroy'
-                }
-            }
-
-            steps{
-                script{
-                    if (params.terraformAction == 'apply'){
-                        sh "pwd;cd project-1/; terraform apply -input=false tfplan"
-                    } else if(params.terraformAction == 'destroy'){
-                        sh "pwd;cd project-1/; terraform destroy -auto-approve"
-                    }
-
-                }
-            }
-        }
-    }
+  }
 }
-
