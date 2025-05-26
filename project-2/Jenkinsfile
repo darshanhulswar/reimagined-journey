@@ -15,7 +15,7 @@ pipeline {
       steps {
         script {
           sh '''
-            cd terraform-iam-s3
+            cd project-2/
 
             echo "Updating terraform.tfvars with new user: ${NEW_USER}"
 
