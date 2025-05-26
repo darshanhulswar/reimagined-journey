@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   parameters {
-    string(name: 'NEW_USER', defaultValue: 'newuser', description: 'IAM user to add or remove')
+    // string(name: 'NEW_USER', defaultValue: 'newuser', description: 'IAM user to add or remove')
     choice(name: 'terraformAction', choices: ['apply', 'destroy'], description: 'Choose Terraform action: apply (create user) or destroy (delete user)')
   }
 
