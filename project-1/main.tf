@@ -37,11 +37,17 @@ resource "aws_subnet" "subnet_2" {
 # creating internet gw
 resource "aws_internet_gateway" "myigw" {
     vpc_id = aws_vpc.myvpc.id
+    tags = {
+      Name = "MyIGW"
+    }
 }
 
 #creating the route table
 resource "aws_route_table" "public_route_table" {
     vpc_id = aws_vpc.myvpc.id
+    tags = {
+      name = "route_table-custom"
+    }
 }
 
 # creating the route
@@ -49,12 +55,14 @@ resource "aws_route" "public_route" {
     route_table_id = aws_route_table.public_route_table.id
     destination_cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.myigw.id
+
 }
 
 #route associations
 resource "aws_route_table_association" "public_subnet_association" {
   subnet_id = aws_subnet.subnet_1.id
   route_table_id = aws_route_table.public_route_table.id
+
 }
 
 
