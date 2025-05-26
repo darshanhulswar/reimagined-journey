@@ -1,0 +1,39 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'NEW_USER', defaultValue: 'newuser', description: 'IAM user to add')
+  }
+
+  environment {
+    AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+  }
+
+  stages {
+    stage('Update IAM Users with Terraform') {
+      steps {
+        script {
+          sh '''
+            cd terraform-iam-s3
+
+            echo "Updating terraform.tfvars with new user: ${NEW_USER}"
+
+            # Extract current list of users
+            CURRENT_USERS=$(grep 'iam_users' terraform.tfvars | sed 's/iam_users = \\[//;s/\\]//;s/"//g' | tr -d ' ')
+            
+            # Add new user if not already present
+            if ! echo "$CURRENT_USERS" | grep -q "${NEW_USER}"; then
+              UPDATED_USERS=$(echo "$CURRENT_USERS" | awk -v new="${NEW_USER}" 'BEGIN{ORS=""; print "["} {n=split($0, a, ","); for(i=1;i<=n;i++) printf "\\"%s\\",", a[i]; print "\\"" new "\\""} END{print "]"}')
+              
+              echo "iam_users = ${UPDATED_USERS}" > terraform.tfvars
+            fi
+
+            terraform init
+            terraform apply -auto-approve
+          '''
+        }
+      }
+    }
+  }
+}
