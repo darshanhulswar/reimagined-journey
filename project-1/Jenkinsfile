@@ -13,9 +13,11 @@ pipeline {
 
     stages {
         stage('checkout') {
-            script {
-                dir('terraform') {
-                    git branch: 'terraform-automation', url: 'https://github.com/darshanhulswar/reimagined-journey.git'
+            steps {
+                script {
+                    dir('terraform') {
+                        git branch: 'terraform-automation', url: 'https://github.com/darshanhulswar/reimagined-journey.git'
+                    }
                 }
             }
         }
