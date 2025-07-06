@@ -27,6 +27,7 @@ pipeline {
                 sh 'pwd; cd project-1; terraform show -no-color tfplan >> tfplan.txt'
             }
         }
+        /* groovylint-disable */
         stage('approval') {
             steps {
                 script {
@@ -51,7 +52,7 @@ pipeline {
                     return params.terraformAction == 'apply' || params.terraformAction == 'destroy'
                 }
             }
-        /* groovylint-disable */
+
             steps {
                 script {
                     if(params.terraformAction == 'apply') {
